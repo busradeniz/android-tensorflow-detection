@@ -41,7 +41,6 @@ import android.view.Surface;
 import android.view.WindowManager;
 import android.widget.Toast;
 
-
 import com.busradeniz.detection.env.ImageUtils;
 import com.busradeniz.detection.env.Logger;
 
