@@ -35,6 +35,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Trace;
+import android.speech.tts.TextToSpeech;
 import android.util.Size;
 import android.view.KeyEvent;
 import android.view.Surface;
@@ -71,6 +72,8 @@ public abstract class CameraActivity extends Activity
   private Runnable postInferenceCallback;
   private Runnable imageConverter;
 
+  private TextToSpeech textToSpeech;
+
   @Override
   protected void onCreate(final Bundle savedInstanceState) {
     LOGGER.d("onCreate " + this);
@@ -84,6 +87,18 @@ public abstract class CameraActivity extends Activity
     } else {
       requestPermission();
     }
+
+    this.textToSpeech = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+      @Override
+      public void onInit(int status) {
+        if (status == TextToSpeech.SUCCESS) {
+          LOGGER.i("onCreate", "TextToSpeech is initialised");
+        } else {
+          LOGGER.e("onCreate", "Cannot initialise text to speech!");
+        }
+      }
+    });
+
   }
 
   private byte[] lastPreviewFrame;
@@ -247,6 +262,11 @@ public abstract class CameraActivity extends Activity
       handler = null;
     } catch (final InterruptedException e) {
       LOGGER.e(e, "Exception!");
+    }
+
+    if (textToSpeech != null) {
+      textToSpeech.stop();
+      textToSpeech.shutdown();
     }
 
     super.onPause();
@@ -438,6 +458,10 @@ public abstract class CameraActivity extends Activity
       default:
         return 0;
     }
+  }
+
+  protected void toSpeech(Classifier.Recognition recognition) {
+    textToSpeech.speak(recognition.getTitle(), TextToSpeech.QUEUE_FLUSH, null);
   }
 
   protected abstract void processImage();

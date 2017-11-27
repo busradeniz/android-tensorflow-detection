@@ -79,6 +79,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
   private byte[] luminanceCopy;
 
   private BorderedText borderedText;
+
   @Override
   public void onPreviewSizeChosen(final Size size, final int rotation) {
     final float textSizePx =
@@ -234,6 +235,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
             for (final Classifier.Recognition result : results) {
               final RectF location = result.getLocation();
               if (location != null && result.getConfidence() >= MINIMUM_CONFIDENCE_TF_OD_API) {
+                LOGGER.i("Title: " + result.getTitle());
+                toSpeech(result);
                 canvas.drawRect(location, paint);
 
                 cropToFrameTransform.mapRect(location);
