@@ -28,7 +28,9 @@ android {
         }
     }
 
-    sourceSets.main.assets.srcDirs = [project.ext.ASSET_DIR]
+    lintOptions {
+        abortOnError false
+    }
 }
 
 dependencies {
