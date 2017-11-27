@@ -37,7 +37,6 @@ import android.os.HandlerThread;
 import android.os.Trace;
 import android.speech.tts.TextToSpeech;
 import android.util.Size;
-import android.view.KeyEvent;
 import android.view.Surface;
 import android.view.WindowManager;
 import android.widget.Toast;
@@ -55,8 +54,6 @@ public abstract class CameraActivity extends Activity
 
   private static final String PERMISSION_CAMERA = Manifest.permission.CAMERA;
   private static final String PERMISSION_STORAGE = Manifest.permission.WRITE_EXTERNAL_STORAGE;
-
-  private boolean debug = false;
 
   private Handler handler;
   private HandlerThread handlerThread;
@@ -101,8 +98,6 @@ public abstract class CameraActivity extends Activity
 
   }
 
-  private byte[] lastPreviewFrame;
-
   protected int[] getRgbBytes() {
     imageConverter.run();
     return rgbBytes;
@@ -141,7 +136,6 @@ public abstract class CameraActivity extends Activity
     }
 
     isProcessingFrame = true;
-    lastPreviewFrame = bytes;
     yuvBytes[0] = bytes;
     yRowStride = previewWidth;
 
@@ -408,37 +402,6 @@ public abstract class CameraActivity extends Activity
       }
       buffer.get(yuvBytes[i]);
     }
-  }
-
-  public boolean isDebug() {
-    return debug;
-  }
-
-  public void requestRender() {
-    final OverlayView overlay = (OverlayView) findViewById(R.id.debug_overlay);
-    if (overlay != null) {
-      overlay.postInvalidate();
-    }
-  }
-
-  public void addCallback(final OverlayView.DrawCallback callback) {
-    final OverlayView overlay = (OverlayView) findViewById(R.id.debug_overlay);
-    if (overlay != null) {
-      overlay.addCallback(callback);
-    }
-  }
-
-  public void onSetDebug(final boolean debug) {}
-
-  @Override
-  public boolean onKeyDown(final int keyCode, final KeyEvent event) {
-    if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-      debug = !debug;
-      requestRender();
-      onSetDebug(debug);
-      return true;
-    }
-    return super.onKeyDown(keyCode, event);
   }
 
   protected void readyForNextImage() {
