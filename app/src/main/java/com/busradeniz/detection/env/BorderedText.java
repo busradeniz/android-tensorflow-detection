@@ -1,18 +1,3 @@
-/* Copyright 2016 The TensorFlow Authors. All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-==============================================================================*/
-
 package com.busradeniz.detection.env;
 
 import android.graphics.Canvas;
@@ -81,38 +66,4 @@ public class BorderedText {
     canvas.drawText(text, posX, posY, interiorPaint);
   }
 
-  public void drawLines(Canvas canvas, final float posX, final float posY, Vector<String> lines) {
-    int lineNum = 0;
-    for (final String line : lines) {
-      drawText(canvas, posX, posY - getTextSize() * (lines.size() - lineNum - 1), line);
-      ++lineNum;
-    }
-  }
-
-  public void setInteriorColor(final int color) {
-    interiorPaint.setColor(color);
-  }
-
-  public void setExteriorColor(final int color) {
-    exteriorPaint.setColor(color);
-  }
-
-  public float getTextSize() {
-    return textSize;
-  }
-
-  public void setAlpha(final int alpha) {
-    interiorPaint.setAlpha(alpha);
-    exteriorPaint.setAlpha(alpha);
-  }
-
-  public void getTextBounds(
-          final String line, final int index, final int count, final Rect lineBounds) {
-    interiorPaint.getTextBounds(line, index, count, lineBounds);
-  }
-
-  public void setTextAlign(final Align align) {
-    interiorPaint.setTextAlign(align);
-    exteriorPaint.setTextAlign(align);
-  }
 }

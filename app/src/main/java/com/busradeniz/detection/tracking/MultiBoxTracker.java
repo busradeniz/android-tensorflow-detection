@@ -1,18 +1,3 @@
-/* Copyright 2016 The TensorFlow Authors. All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-==============================================================================*/
-
 package com.busradeniz.detection.tracking;
 
 import android.content.Context;
@@ -27,7 +12,6 @@ import android.graphics.RectF;
 import android.text.TextUtils;
 import android.util.Pair;
 import android.util.TypedValue;
-import android.widget.Toast;
 
 import com.busradeniz.detection.Classifier;
 import com.busradeniz.detection.env.BorderedText;
@@ -47,18 +31,7 @@ public class MultiBoxTracker {
 
   private static final float TEXT_SIZE_DIP = 18;
 
-  // Maximum percentage of a box that can be overlapped by another box at detection time. Otherwise
-  // the lower scored box (new or old) will be removed.
-  private static final float MAX_OVERLAP = 0.2f;
-
   private static final float MIN_SIZE = 16.0f;
-
-  // Allow replacement of the tracked box with new results if
-  // correlation has dropped below this level.
-  private static final float MARGINAL_CORRELATION = 0.75f;
-
-  // Consider object to be lost if correlation falls below this threshold.
-  private static final float MIN_CORRELATION = 0.3f;
 
   private static final int[] COLORS = {
     Color.BLUE, Color.RED, Color.GREEN, Color.YELLOW, Color.CYAN, Color.MAGENTA, Color.WHITE,
@@ -67,21 +40,18 @@ public class MultiBoxTracker {
     Color.parseColor("#AA33AA"), Color.parseColor("#0D0068")
   };
 
-  private final Queue<Integer> availableColors = new LinkedList<Integer>();
+  private final Queue<Integer> availableColors = new LinkedList<>();
 
-  public ObjectTracker objectTracker;
-
-  final List<Pair<Float, RectF>> screenRects = new LinkedList<Pair<Float, RectF>>();
+  final List<Pair<Float, RectF>> screenRects = new LinkedList<>();
 
   private static class TrackedRecognition {
-    ObjectTracker.TrackedObject trackedObject;
     RectF location;
     float detectionConfidence;
     int color;
     String title;
   }
 
-  private final List<TrackedRecognition> trackedObjects = new LinkedList<TrackedRecognition>();
+  private final List<TrackedRecognition> trackedObjects = new LinkedList<>();
 
   private final Paint boxPaint = new Paint();
 
@@ -94,10 +64,8 @@ public class MultiBoxTracker {
   private int frameHeight;
 
   private int sensorOrientation;
-  private Context context;
 
   public MultiBoxTracker(final Context context) {
-    this.context = context;
     for (final int color : COLORS) {
       availableColors.add(color);
     }
@@ -119,47 +87,9 @@ public class MultiBoxTracker {
     return frameToCanvasMatrix;
   }
 
-  public synchronized void drawDebug(final Canvas canvas) {
-    final Paint textPaint = new Paint();
-    textPaint.setColor(Color.WHITE);
-    textPaint.setTextSize(60.0f);
-
-    final Paint boxPaint = new Paint();
-    boxPaint.setColor(Color.RED);
-    boxPaint.setAlpha(200);
-    boxPaint.setStyle(Style.STROKE);
-
-    for (final Pair<Float, RectF> detection : screenRects) {
-      final RectF rect = detection.second;
-      canvas.drawRect(rect, boxPaint);
-      canvas.drawText("" + detection.first, rect.left, rect.top, textPaint);
-      borderedText.drawText(canvas, rect.centerX(), rect.centerY(), "" + detection.first);
-    }
-
-    if (objectTracker == null) {
-      return;
-    }
-
-    // Draw correlations.
-    for (final TrackedRecognition recognition : trackedObjects) {
-      final ObjectTracker.TrackedObject trackedObject = recognition.trackedObject;
-
-      final RectF trackedPos = trackedObject.getTrackedPositionInPreviewFrame();
-
-      if (getFrameToCanvasMatrix().mapRect(trackedPos)) {
-        final String labelString = String.format("%.2f", trackedObject.getCurrentCorrelation());
-        borderedText.drawText(canvas, trackedPos.right, trackedPos.bottom, labelString);
-      }
-    }
-
-    final Matrix matrix = getFrameToCanvasMatrix();
-    objectTracker.drawDebug(canvas, matrix);
-  }
-
-  public synchronized void trackResults(
-          final List<Classifier.Recognition> results, final byte[] frame, final long timestamp) {
-    logger.i("Processing %d results from %d", results.size(), timestamp);
-    processResults(timestamp, results, frame);
+  public synchronized void trackResults(final List<Classifier.Recognition> results) {
+    logger.i("Processing %d results", results.size());
+    processResults(results);
   }
 
   public synchronized void draw(final Canvas canvas) {
@@ -176,10 +106,7 @@ public class MultiBoxTracker {
             sensorOrientation,
             false);
     for (final TrackedRecognition recognition : trackedObjects) {
-      final RectF trackedPos =
-          (objectTracker != null)
-              ? recognition.trackedObject.getTrackedPositionInPreviewFrame()
-              : new RectF(recognition.location);
+      final RectF trackedPos = new RectF(recognition.location);
 
       getFrameToCanvasMatrix().mapRect(trackedPos);
       boxPaint.setColor(recognition.color);
@@ -200,54 +127,17 @@ public class MultiBoxTracker {
   public synchronized void onFrame(
       final int w,
       final int h,
-      final int rowStride,
-      final int sensorOrienation,
-      final byte[] frame,
-      final long timestamp) {
-    if (objectTracker == null && !initialized) {
-      ObjectTracker.clearInstance();
-
-      logger.i("Initializing ObjectTracker: %dx%d", w, h);
-      objectTracker = ObjectTracker.getInstance(w, h, rowStride, true);
+      final int sensorOrienation) {
+    if (!initialized) {
       frameWidth = w;
       frameHeight = h;
       this.sensorOrientation = sensorOrienation;
       initialized = true;
-
-      if (objectTracker == null) {
-        String message =
-            "Object tracking support not found. "
-                + "See tensorflow/examples/android/README.md for details.";
-        Toast.makeText(context, message, Toast.LENGTH_LONG).show();
-        logger.e(message);
-      }
-    }
-
-    if (objectTracker == null) {
-      return;
-    }
-
-    objectTracker.nextFrame(frame, null, timestamp, null, true);
-
-    // Clean up any objects not worth tracking any more.
-    final LinkedList<TrackedRecognition> copyList =
-        new LinkedList<TrackedRecognition>(trackedObjects);
-    for (final TrackedRecognition recognition : copyList) {
-      final ObjectTracker.TrackedObject trackedObject = recognition.trackedObject;
-      final float correlation = trackedObject.getCurrentCorrelation();
-      if (correlation < MIN_CORRELATION) {
-        logger.v("Removing tracked object %s because NCC is %.2f", trackedObject, correlation);
-        trackedObject.stopTracking();
-        trackedObjects.remove(recognition);
-
-        availableColors.add(recognition.color);
-      }
     }
   }
 
-  private void processResults(
-          final long timestamp, final List<Classifier.Recognition> results, final byte[] originalFrame) {
-    final List<Pair<Float, Classifier.Recognition>> rectsToTrack = new LinkedList<Pair<Float, Classifier.Recognition>>();
+  private void processResults(final List<Classifier.Recognition> results) {
+    final List<Pair<Float, Classifier.Recognition>> rectsToTrack = new LinkedList<>();
 
     screenRects.clear();
     final Matrix rgbFrameToScreen = new Matrix(getFrameToCanvasMatrix());
@@ -264,14 +154,14 @@ public class MultiBoxTracker {
       logger.v(
           "Result! Frame: " + result.getLocation() + " mapped to screen:" + detectionScreenRect);
 
-      screenRects.add(new Pair<Float, RectF>(result.getConfidence(), detectionScreenRect));
+      screenRects.add(new Pair<>(result.getConfidence(), detectionScreenRect));
 
       if (detectionFrameRect.width() < MIN_SIZE || detectionFrameRect.height() < MIN_SIZE) {
         logger.w("Degenerate rectangle! " + detectionFrameRect);
         continue;
       }
 
-      rectsToTrack.add(new Pair<Float, Classifier.Recognition>(result.getConfidence(), result));
+      rectsToTrack.add(new Pair<>(result.getConfidence(), result));
     }
 
     if (rectsToTrack.isEmpty()) {
@@ -279,145 +169,18 @@ public class MultiBoxTracker {
       return;
     }
 
-    if (objectTracker == null) {
-      trackedObjects.clear();
-      for (final Pair<Float, Classifier.Recognition> potential : rectsToTrack) {
-        final TrackedRecognition trackedRecognition = new TrackedRecognition();
-        trackedRecognition.detectionConfidence = potential.first;
-        trackedRecognition.location = new RectF(potential.second.getLocation());
-        trackedRecognition.trackedObject = null;
-        trackedRecognition.title = potential.second.getTitle();
-        trackedRecognition.color = COLORS[trackedObjects.size()];
-        trackedObjects.add(trackedRecognition);
-
-        if (trackedObjects.size() >= COLORS.length) {
-          break;
-        }
-      }
-      return;
-    }
-
-    logger.i("%d rects to track", rectsToTrack.size());
+    trackedObjects.clear();
     for (final Pair<Float, Classifier.Recognition> potential : rectsToTrack) {
-      handleDetection(originalFrame, timestamp, potential);
-    }
-  }
+      final TrackedRecognition trackedRecognition = new TrackedRecognition();
+      trackedRecognition.detectionConfidence = potential.first;
+      trackedRecognition.location = new RectF(potential.second.getLocation());
+      trackedRecognition.title = potential.second.getTitle();
+      trackedRecognition.color = COLORS[trackedObjects.size()];
+      trackedObjects.add(trackedRecognition);
 
-  private void handleDetection(
-      final byte[] frameCopy, final long timestamp, final Pair<Float, Classifier.Recognition> potential) {
-    final ObjectTracker.TrackedObject potentialObject =
-        objectTracker.trackObject(potential.second.getLocation(), timestamp, frameCopy);
-
-    final float potentialCorrelation = potentialObject.getCurrentCorrelation();
-    logger.v(
-        "Tracked object went from %s to %s with correlation %.2f",
-        potential.second, potentialObject.getTrackedPositionInPreviewFrame(), potentialCorrelation);
-
-    if (potentialCorrelation < MARGINAL_CORRELATION) {
-      logger.v("Correlation too low to begin tracking %s.", potentialObject);
-      potentialObject.stopTracking();
-      return;
-    }
-
-    final List<TrackedRecognition> removeList = new LinkedList<TrackedRecognition>();
-
-    float maxIntersect = 0.0f;
-
-    // This is the current tracked object whose color we will take. If left null we'll take the
-    // first one from the color queue.
-    TrackedRecognition recogToReplace = null;
-
-    // Look for intersections that will be overridden by this object or an intersection that would
-    // prevent this one from being placed.
-    for (final TrackedRecognition trackedRecognition : trackedObjects) {
-      final RectF a = trackedRecognition.trackedObject.getTrackedPositionInPreviewFrame();
-      final RectF b = potentialObject.getTrackedPositionInPreviewFrame();
-      final RectF intersection = new RectF();
-      final boolean intersects = intersection.setIntersect(a, b);
-
-      final float intersectArea = intersection.width() * intersection.height();
-      final float totalArea = a.width() * a.height() + b.width() * b.height() - intersectArea;
-      final float intersectOverUnion = intersectArea / totalArea;
-
-      // If there is an intersection with this currently tracked box above the maximum overlap
-      // percentage allowed, either the new recognition needs to be dismissed or the old
-      // recognition needs to be removed and possibly replaced with the new one.
-      if (intersects && intersectOverUnion > MAX_OVERLAP) {
-        if (potential.first < trackedRecognition.detectionConfidence
-            && trackedRecognition.trackedObject.getCurrentCorrelation() > MARGINAL_CORRELATION) {
-          // If track for the existing object is still going strong and the detection score was
-          // good, reject this new object.
-          potentialObject.stopTracking();
-          return;
-        } else {
-          removeList.add(trackedRecognition);
-
-          // Let the previously tracked object with max intersection amount donate its color to
-          // the new object.
-          if (intersectOverUnion > maxIntersect) {
-            maxIntersect = intersectOverUnion;
-            recogToReplace = trackedRecognition;
-          }
-        }
+      if (trackedObjects.size() >= COLORS.length) {
+        break;
       }
     }
-
-    // If we're already tracking the max object and no intersections were found to bump off,
-    // pick the worst current tracked object to remove, if it's also worse than this candidate
-    // object.
-    if (availableColors.isEmpty() && removeList.isEmpty()) {
-      for (final TrackedRecognition candidate : trackedObjects) {
-        if (candidate.detectionConfidence < potential.first) {
-          if (recogToReplace == null
-              || candidate.detectionConfidence < recogToReplace.detectionConfidence) {
-            // Save it so that we use this color for the new object.
-            recogToReplace = candidate;
-          }
-        }
-      }
-      if (recogToReplace != null) {
-        logger.v("Found non-intersecting object to remove.");
-        removeList.add(recogToReplace);
-      } else {
-        logger.v("No non-intersecting object found to remove");
-      }
-    }
-
-    // Remove everything that got intersected.
-    for (final TrackedRecognition trackedRecognition : removeList) {
-      logger.v(
-          "Removing tracked object %s with detection confidence %.2f, correlation %.2f",
-          trackedRecognition.trackedObject,
-          trackedRecognition.detectionConfidence,
-          trackedRecognition.trackedObject.getCurrentCorrelation());
-      trackedRecognition.trackedObject.stopTracking();
-      trackedObjects.remove(trackedRecognition);
-      if (trackedRecognition != recogToReplace) {
-        availableColors.add(trackedRecognition.color);
-      }
-    }
-
-    if (recogToReplace == null && availableColors.isEmpty()) {
-      logger.e("No room to track this object, aborting.");
-      potentialObject.stopTracking();
-      return;
-    }
-
-    // Finally safe to say we can track this object.
-    logger.v(
-        "Tracking object %s (%s) with detection confidence %.2f at position %s",
-        potentialObject,
-        potential.second.getTitle(),
-        potential.first,
-        potential.second.getLocation());
-    final TrackedRecognition trackedRecognition = new TrackedRecognition();
-    trackedRecognition.detectionConfidence = potential.first;
-    trackedRecognition.trackedObject = potentialObject;
-    trackedRecognition.title = potential.second.getTitle();
-
-    // Use the color from a replaced object before taking one from the color queue.
-    trackedRecognition.color =
-        recogToReplace != null ? recogToReplace.color : availableColors.poll();
-    trackedObjects.add(trackedRecognition);
   }
 }

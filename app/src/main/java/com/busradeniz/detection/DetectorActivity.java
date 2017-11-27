@@ -140,10 +140,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     tracker.onFrame(
         previewWidth,
         previewHeight,
-        getLuminanceStride(),
-        sensorOrientation,
-        originalLuminance,
-        timestamp);
+        sensorOrientation);
     trackingOverlay.postInvalidate();
 
     // No mutex needed as this method is not reentrant.
@@ -195,7 +192,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
               }
             }
 
-            tracker.trackResults(mappedRecognitions, luminanceCopy, currTimestamp);
+            tracker.trackResults(mappedRecognitions);
             trackingOverlay.postInvalidate();
 
             computingDetection = false;

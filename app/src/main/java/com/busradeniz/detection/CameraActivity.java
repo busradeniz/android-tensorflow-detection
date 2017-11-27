@@ -103,10 +103,6 @@ public abstract class CameraActivity extends Activity
     return rgbBytes;
   }
 
-  protected int getLuminanceStride() {
-    return yRowStride;
-  }
-
   protected byte[] getLuminance() {
     return yuvBytes[0];
   }
