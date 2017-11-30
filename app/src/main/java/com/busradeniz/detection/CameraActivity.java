@@ -18,7 +18,6 @@ package com.busradeniz.detection;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.Fragment;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
@@ -47,7 +46,7 @@ import com.busradeniz.detection.env.Logger;
 import java.nio.ByteBuffer;
 
 public abstract class CameraActivity extends Activity
-    implements OnImageAvailableListener, Camera.PreviewCallback {
+    implements OnImageAvailableListener {
   private static final Logger LOGGER = new Logger();
 
   private static final int PERMISSIONS_REQUEST = 1;
@@ -57,7 +56,6 @@ public abstract class CameraActivity extends Activity
 
   private Handler handler;
   private HandlerThread handlerThread;
-  private boolean useCamera2API;
   private boolean isProcessingFrame = false;
   private byte[][] yuvBytes = new byte[3][];
   private int[] rgbBytes = null;
@@ -105,53 +103,6 @@ public abstract class CameraActivity extends Activity
 
   protected byte[] getLuminance() {
     return yuvBytes[0];
-  }
-
-  /**
-   * Callback for android.hardware.Camera API
-   */
-  @Override
-  public void onPreviewFrame(final byte[] bytes, final Camera camera) {
-    if (isProcessingFrame) {
-      LOGGER.w("Dropping frame!");
-      return;
-    }
-
-    try {
-      // Initialize the storage bitmaps once when the resolution is known.
-      if (rgbBytes == null) {
-        Camera.Size previewSize = camera.getParameters().getPreviewSize();
-        previewHeight = previewSize.height;
-        previewWidth = previewSize.width;
-        rgbBytes = new int[previewWidth * previewHeight];
-        onPreviewSizeChosen(new Size(previewSize.width, previewSize.height), 90);
-      }
-    } catch (final Exception e) {
-      LOGGER.e(e, "Exception!");
-      return;
-    }
-
-    isProcessingFrame = true;
-    yuvBytes[0] = bytes;
-    yRowStride = previewWidth;
-
-    imageConverter =
-        new Runnable() {
-          @Override
-          public void run() {
-            ImageUtils.convertYUV420SPToARGB8888(bytes, previewWidth, previewHeight, rgbBytes);
-          }
-        };
-
-    postInferenceCallback =
-        new Runnable() {
-          @Override
-          public void run() {
-            camera.addCallbackBuffer(bytes);
-            isProcessingFrame = false;
-          }
-        };
-    processImage();
   }
 
   /**
@@ -344,7 +295,7 @@ public abstract class CameraActivity extends Activity
           continue;
         }
 
-        useCamera2API = isHardwareLevelSupported(characteristics,
+        boolean useCamera2API = isHardwareLevelSupported(characteristics,
             CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL);
         LOGGER.i("Camera API lv2?: %s", useCamera2API);
         return cameraId;
@@ -359,8 +310,6 @@ public abstract class CameraActivity extends Activity
   protected void setFragment() {
     String cameraId = chooseCamera();
 
-    Fragment fragment;
-    if (useCamera2API) {
       CameraConnectionFragment camera2Fragment =
           CameraConnectionFragment.newInstance(
               new CameraConnectionFragment.ConnectionCallback() {
@@ -376,14 +325,10 @@ public abstract class CameraActivity extends Activity
               getDesiredPreviewFrameSize());
 
       camera2Fragment.setCamera(cameraId);
-      fragment = camera2Fragment;
-    } else {
-      fragment = null;
-    }
 
     getFragmentManager()
         .beginTransaction()
-        .replace(R.id.container, fragment)
+        .replace(R.id.container, camera2Fragment)
         .commit();
   }
 

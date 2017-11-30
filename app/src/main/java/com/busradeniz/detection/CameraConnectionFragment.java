@@ -413,7 +413,6 @@ public class CameraConnectionFragment extends Fragment {
   /**
    * Opens the camera specified by {@link CameraConnectionFragment#cameraId}.
    */
-  @SuppressLint("MissingPermission")
   private void openCamera(final int width, final int height) {
     setUpCameraOutputs();
     configureTransform(width, height);
