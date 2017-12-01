@@ -183,7 +183,6 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
               final RectF location = result.getLocation();
               if (location != null && result.getConfidence() >= MINIMUM_CONFIDENCE_TF_OD_API) {
                 LOGGER.i("Title: " + result.getTitle());
-                toSpeech(result);
                 canvas.drawRect(location, paint);
 
                 cropToFrameTransform.mapRect(location);
@@ -192,6 +191,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
               }
             }
 
+            toSpeech(mappedRecognitions);
             tracker.trackResults(mappedRecognitions);
             trackingOverlay.postInvalidate();
 

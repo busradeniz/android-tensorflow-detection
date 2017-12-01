@@ -44,6 +44,10 @@ import com.busradeniz.detection.env.ImageUtils;
 import com.busradeniz.detection.env.Logger;
 
 import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public abstract class CameraActivity extends Activity
     implements OnImageAvailableListener {
@@ -364,8 +368,49 @@ public abstract class CameraActivity extends Activity
     }
   }
 
-  protected void toSpeech(Classifier.Recognition recognition) {
-    textToSpeech.speak(recognition.getTitle(), TextToSpeech.QUEUE_FLUSH, null);
+
+  private Set<Classifier.Recognition> currentRecognitions;
+
+  protected void toSpeech(List<Classifier.Recognition> recognitions) {
+    if (recognitions.isEmpty()) {
+      currentRecognitions = Collections.emptySet();
+      return;
+    }
+
+    final Set<Classifier.Recognition> newRecognitions = new HashSet<>(recognitions);
+
+    if (currentRecognitions != null) {
+
+      // Ignore if current and new are same.
+      if (currentRecognitions.equals(newRecognitions)) {
+        return;
+      }
+      final Set<Classifier.Recognition> intersection = new HashSet<>(recognitions);
+      intersection.retainAll(currentRecognitions);
+
+      // Ignore if new is sub set of the current
+      if (intersection.equals(newRecognitions)) {
+        return;
+      }
+    }
+
+    StringBuilder stringBuilder = new StringBuilder();
+    if (recognitions.size() == 1) {
+      stringBuilder.append("There is ");
+    } else {
+      stringBuilder.append("There are ");
+    }
+
+    for (int i = 0; i < recognitions.size() ; i++) {
+      stringBuilder.append(recognitions.get(i).getTitle());
+      if (i + 1 < recognitions.size()) {
+        stringBuilder.append(" and ");
+      }
+    }
+    stringBuilder.append(" on the screen.");
+
+    textToSpeech.speak(stringBuilder.toString(), TextToSpeech.QUEUE_FLUSH, null);
+    currentRecognitions = newRecognitions;
   }
 
   protected abstract void processImage();
